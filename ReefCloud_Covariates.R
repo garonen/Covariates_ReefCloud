@@ -8,6 +8,7 @@ library(ncdf4)
 library(raster)
 library(lubridate)
 
+#load()
 my_wd <- 'F:/ReefCloud/Covariates_ReefCloud'
 if(!dir.exists('./Outputs')) dir.create('./Outputs')
 url_name <- 'https://data.nodc.noaa.gov/thredds/dodsC/cortad/Version6/cortadv6_WeeklySST.nc'
@@ -176,3 +177,67 @@ plot(mean_99)
 # 
 # pnt_exrct <- extract(recent_brick, my_point_data, method = 'bilinear')
 # head(pnt_exrct)
+
+#################################################################################################
+#####################################################################################################
+url_ssta <- 'https://www.ncei.noaa.gov/thredds-ocean/dodsC/cortad/Version6/cortadv6_SSTA.nc'
+ssta_brick <- brick(url_ssta, varname = 'SSTA')
+attributes(ssta_brick)
+plot(ssta_brick[[995]])
+
+# cw <-'F:/ReefCloud/ct5km_ssta-mean_v3.1_2006.nc'
+# cwrast <- raster(cw)
+# cwnc <- ncdf4::nc_open(cw)
+# 
+# attributes(cwnc$var)$names[2]
+# ncatt_get(cwnc, attributes(cwnc$var)$names[2])
+# plot(cwrast)
+summary(my_eez)
+attributes(my_eez)
+my_eez$data
+
+
+
+pal <- subset(my_eez,Territory1 == 'Palau')
+plot(pal, add = T)
+
+ #### Subset to time (z) of interest, currently 2002-2020 -------------------------
+ssta_time <- getZ(ssta_brick)
+  year_idSSTA <- which(ssta_time > as.Date('2002-01-01'))
+    ssta_brick_sub <- subset(ssta_brick, year_idSSTA)
+# have to reintroduce time into brick as it gets chopped during subsetting
+ssta_brick_sub <- setZ(ssta_brick_sub, ssta_time[year_idSSTA])
+# Crop global rasters by a polygon feature of interest----------------------------------
+ssta_crop <- brick()
+for (i in 1:nlayers(ssta_brick_sub))
+  {
+  print(i)
+   ssta_brick_pal <- 
+    mask(crop(ssta_brick_sub[[i]],
+          extent(pal)),
+           overwrite = T,
+            pal
+  )
+print(ssta_crop <- brick(ssta_brick_pal,ssta_crop))
+}
+
+plot(ssta_crop[[2:5]])
+# have to reintroduce the time
+print(ssta_crop <- setZ(ssta_crop, ssta_time[year_idSSTA]))
+##### now calculate annual means of SSTA in degrees Kelvin--------------
+ssta_annual <- zApply(ssta_crop, by = year(getZ(ssta_crop)), fun = 'mean', name = 'annTemp')
+plot(ssta_annual)
+##### and resample the brick to the resolution of the bathy raster
+bathy_pal <- mask(crop(bathy, extent(pal)),pal)
+plot(bathy_pal)
+
+ssta_annual1km <- resample(ssta_annual, bathy_pal, method = 'bilinear') # can write this stack out 
+# but first have to sort out Z values because they get cut out all the time
+plot(ssta_annual1km)
+print(ssta_annual1km <- setZ(ssta_annual1km, getZ(ssta_annual)))
+
+
+
+#  Saving the RASTER BRICK
+# writeRaster(ndvit1, filename="ndvi_2015t1.tif", bandorder='BSQ',
+#             format="GTiff", overwrite=TRUE)
