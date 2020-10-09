@@ -185,16 +185,19 @@ ssta_brick <- brick(url_ssta, varname = 'SSTA')
 attributes(ssta_brick)
 plot(ssta_brick[[995]])
 
-# cw <-'F:/ReefCloud/ct5km_ssta-mean_v3.1_2006.nc'
+# cw <-'F:/ReefCloud/ct5km_dhw-max_v3.1_2019.nc'
 # cwrast <- raster(cw)
 # cwnc <- ncdf4::nc_open(cw)
 # 
 # attributes(cwnc$var)$names[2]
 # ncatt_get(cwnc, attributes(cwnc$var)$names[2])
 # plot(cwrast)
-summary(my_eez)
-attributes(my_eez)
-my_eez$data
+# nc_close(cw)
+# 
+# 
+# summary(my_eez)
+# attributes(my_eez)
+# my_eez$data
 
 
 
@@ -241,3 +244,80 @@ print(ssta_annual1km <- setZ(ssta_annual1km, getZ(ssta_annual)))
 #  Saving the RASTER BRICK
 # writeRaster(ndvit1, filename="ndvi_2015t1.tif", bandorder='BSQ',
 #             format="GTiff", overwrite=TRUE)
+nc_close(url_ssta)
+###################################################################################################
+#################  TSA Thermal Stress Anomalies ------------------
+#   (defined as SST minus Maximum of Weekly Mean Climatological SST)
+###################################################################################################
+url_tsa <- 'https://www.ncei.noaa.gov/thredds-ocean/dodsC/cortad/Version6/cortadv6_TSA.nc'
+tsa_brick <- brick(url_tsa, varname = 'TSA')
+attributes(tsa_brick)
+plot(tsa_brick[[995]])
+### since the dates are the same across all datasets i can use the same dates string as before
+tsa_brick_sub <- subset(tsa_brick, year_idSSTA)
+  tsa_brick_sub <- setZ(tsa_brick_sub, ssta_time[year_idSSTA])
+# Crop global rasters by a polygon feature of interest----------------------------------
+tsa_crop <- brick()
+for (i in 1:nlayers(tsa_brick_sub)){
+  tsa_brick_pal <- 
+    mask(crop(tsa_brick_sub[[i]],
+          extent(pal)),
+           overwrite = T,
+            pal
+  )
+print(tsa_crop <- brick(tsa_brick_pal,tsa_crop))
+}
+plot(tsa_crop[[2:5]])
+# have to reintroduce the time
+print(tsa_crop <- setZ(tsa_crop, ssta_time[year_idSSTA]))
+##### now calculate annual means of SSTA in degrees Kelvin--------------
+tsa_annual <- zApply(tsa_crop, by = year(getZ(tsa_crop)), fun = 'mean')
+plot(tsa_annual)
+##### and resample the brick to the resolution of the bathy raster
+tsa_annual1km <- resample(tsa_annual, bathy_pal, method = 'bilinear') # can write this stack out 
+# but first have to sort out Z values because they get cut out all the time
+print(tsa_annual1km <- setZ(tsa_annual1km, getZ(tsa_annual)))
+####################################################################################################
+######## Filled SST standard_name: sea_surface_skin_temperature ---------------
+# long_name: Gap-Filled weekly SST time series
+####################################################################################################
+url_sst <- 'https://www.ncei.noaa.gov/thredds-ocean/dodsC/cortad/Version6/cortadv6_FilledSST.nc'
+sst_brick <- brick(url_sst, varname = 'FilledSST')
+attributes(sst_brick)
+plot(sst_brick[[995]])
+### since the dates are the same across all datasets i can use the same dates string as before
+sst_brick_sub <- subset(sst_brick, year_idSSTA)
+  sst_brick_sub <- setZ(sst_brick_sub, ssta_time[year_idSSTA])
+# Crop global rasters by a polygon feature of interest----------------------------------
+sst_crop <- brick()
+for (i in 1:nlayers(sst_brick_sub)){
+  sst_brick_pal <- 
+    mask(crop(sst_brick_sub[[i]],
+          extent(pal)),
+           overwrite = T,
+            pal
+  )
+print(sst_crop <- brick(sst_brick_pal,sst_crop))
+}
+plot(sst_crop[[2:5]])
+# have to reintroduce the time
+print(sst_crop <- setZ(sst_crop, sort(ssta_time[year_idSSTA], decreasing = T)))
+##### now calculate annual means of SSTA in degrees Kelvin--------------
+sst_annual <- zApply(sst_crop, by = year(getZ(sst_crop)), fun = 'mean')
+plot(sst_annual)
+##### and resample the brick to the resolution of the bathy raster
+sst_annual1km <- resample(sst_annual, bathy_pal, method = 'bilinear') # can write this stack out 
+# but first have to sort out Z values because they get cut out all the time
+print(sst_annual1km <- setZ(sst_annual1km, getZ(sst_annual)))
+
+plot(sst_annual1km)
+
+########## Extract only summer months and calculate temperature means across years---------------
+smr_time <- which(month(getZ(sst_crop)) >= 06 & month(getZ(sst_crop))<= 08) 
+  print(smr_sst <- subset(sst_crop, smr_time))
+  smr_sst <- setZ(smr_sst, getZ(sst_crop)[smr_time])
+  plot(smr_sst[[1:5]])
+  sst_smr_annl <- zApply(smr_sst, by = year(getZ(smr_sst)), fun = 'mean', 'years')
+  plot(sst_smr_annl)
+
+save.image(file = 'F:/ReefCloud/Covariates_ReefCloud/RC_covariates.RData')
