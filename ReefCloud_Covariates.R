@@ -8,7 +8,7 @@ library(ncdf4)
 library(raster)
 library(lubridate)
 
-#load()
+load('F:/ReefCloud/Covariates_ReefCloud/RC_covariates.RData')
 my_wd <- 'F:/ReefCloud/Covariates_ReefCloud'
 if(!dir.exists('./Outputs')) dir.create('./Outputs')
 url_name <- 'https://data.nodc.noaa.gov/thredds/dodsC/cortad/Version6/cortadv6_WeeklySST.nc'
@@ -319,5 +319,74 @@ smr_time <- which(month(getZ(sst_crop)) >= 06 & month(getZ(sst_crop))<= 08)
   plot(smr_sst[[1:5]])
   sst_smr_annl <- zApply(smr_sst, by = year(getZ(smr_sst)), fun = 'mean', 'years')
   plot(sst_smr_annl)
+#####################################################################################################
+####################################################################################################
 
+ssta_dhw <- brick(url_ssta, varname = 'SSTA_DHW')  
+plot(ssta_dhw[[1:4]])
+attributes(ssta_dhw)  
+  getZ(ssta_dhw)
+  
+ssta_dhw_pal <- 
+    mask(crop(ssta_dhw,
+          extent(pal)),
+          overwrite = T,
+          pal,
+          progress = 'text'
+  )  
+  
+plot(ssta_dhw_pal[[900:910]])
+#   
+# install.packages('remote')  
+# remotes::install_github("RS-eco/processNC", build_vignettes=T)
+# library(processNC)  
+# nc_ssta_freq <- paste0("https://www.ncei.noaa.gov/thredds-ocean/dodsC/cortad/Version6/cortadv6_SSTA.nc")
+# 
+# 
+# basename(nc_ssta_freq)
+# ssta_freq_pal <- subsetNC(nc_ssta_freq, 
+#                           ext = pal,
+#                           startdate = 2002,
+#                           enddate = 2019,
+#                           var = 'SSTA_Frequency')
+
+##########  Frequency of SST Anomalies >= 1 deg C over previous 52 weeks #########################
+### so in this case i can find the last date of that year and and used that raster to represent 
+### ssta frequency in that year
+ssta_freq <- brick(url_ssta, varname = 'SSTA_Frequency')   
+ssta_freq_pal <- 
+    mask(crop(ssta_freq,
+          extent(pal)),
+          overwrite = T,
+          pal,
+          progress = 'text'
+  )
+plot(ssta_freq_pal[[60:70]])
+
+######  Trying to install rts package then identify last dates rasters in each year and extract
+# ssta frequency for each year
+install.packages('rts', dependencies = T)
+library(rts)  
+class(z_time)
+# ssta_freq_pal@data@names <- as.character(z_time)
+# attributes(ssta_freq_pal)
+print(ssta_freq1km <- raster::resample(ssta_freq_pal, bathy_pal, method = 'bilinear'))
+ssta_rs <- rts(ssta_freq1km, z_time)
+plot(ssta_rs[[90:100]])
+attributes(ssta_rs)
+
+ssta_ends <- subset(ssta_rs,endpoints(ssta_rs, 'years')) # so this is ssta frequency for
+# the previous 52 weeks in each year
+plot(ssta_ends[[30:38]])
+ssta_ends_brick <- brick(ssta_ends@raster)
+print(ssta_freq1km <- raster::resample(ssta_ends@raster, bathy_pal, method = 'bilinear'))
+ writeRaster(ssta_ends@raster,'F:/ReefCloud/Covariates_ReefCloud/Outputs/SSTA_Freq.tif',
+           overwrite = T,
+           progress = 'text',
+           format = 'GTiff',
+           bylayer = T,
+           standardnames = T,
+           #suffix = names(ssta_ends@raster)
+           
+           )
 save.image(file = 'F:/ReefCloud/Covariates_ReefCloud/RC_covariates.RData')
