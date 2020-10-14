@@ -7,6 +7,8 @@
 library(ncdf4)
 library(raster)
 library(lubridate)
+library(rts)  
+
 
 load('F:/ReefCloud/Covariates_ReefCloud/RC_covariates.RData')
 my_wd <- 'F:/ReefCloud/Covariates_ReefCloud'
@@ -365,28 +367,37 @@ plot(ssta_freq_pal[[60:70]])
 
 ######  Trying to install rts package then identify last dates rasters in each year and extract
 # ssta frequency for each year
-install.packages('rts', dependencies = T)
-library(rts)  
 class(z_time)
 # ssta_freq_pal@data@names <- as.character(z_time)
 # attributes(ssta_freq_pal)
-print(ssta_freq1km <- raster::resample(ssta_freq_pal, bathy_pal, method = 'bilinear'))
-ssta_rs <- rts(ssta_freq1km, z_time)
+
+summary(ssta_freq_pal[[1980]])
+# first resample to the bathy raster resolution
+print(ssta_freq1km <- raster::resample(ssta_freq_pal, bathy_pal, method = 'ngb'))
+
+  ssta_freq1km[is.na(ssta_freq1km)] <- -99999
+  ssta_freq_rcls <- reclassify(ssta_freq1km, cbind(NA, -99999))
+  
+    summary(ssta_freq_rcls[[1980]])
+    plot(ssta_freq_rcls[[90:100]])
+    
+# convert to rts object
+ssta_rs <- rts(ssta_freq_rcls, z_time)
 plot(ssta_rs[[90:100]])
 attributes(ssta_rs)
 
 ssta_ends <- subset(ssta_rs,endpoints(ssta_rs, 'years')) # so this is ssta frequency for
 # the previous 52 weeks in each year
 plot(ssta_ends[[30:38]])
-ssta_ends_brick <- brick(ssta_ends@raster)
-print(ssta_freq1km <- raster::resample(ssta_ends@raster, bathy_pal, method = 'bilinear'))
+
+### Save individual rasters in a folder with names allocated from the dates vector
  writeRaster(ssta_ends@raster,'F:/ReefCloud/Covariates_ReefCloud/Outputs/SSTA_Freq.tif',
-           overwrite = T,
-           progress = 'text',
-           format = 'GTiff',
-           bylayer = T,
-           standardnames = T,
-           #suffix = names(ssta_ends@raster)
+             overwrite = T,
+             progress = 'text',
+             format = 'GTiff',
+             datatype = 'INT2U',
+             bylayer = T,
+             suffix = rownames(as.data.frame(ssta_ends@time))
            
            )
 save.image(file = 'F:/ReefCloud/Covariates_ReefCloud/RC_covariates.RData')
