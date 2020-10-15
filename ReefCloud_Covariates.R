@@ -313,7 +313,22 @@ sst_annual1km <- resample(sst_annual, bathy_pal, method = 'bilinear') # can writ
 print(sst_annual1km <- setZ(sst_annual1km, getZ(sst_annual)))
 
 plot(sst_annual1km)
-
+##################################################################################################
+##################################################################################################
+sst_pal <- 
+    mask(crop(sst_brick,
+          extent(pal)),
+          overwrite = T,
+          pal,
+          progress = 'text',
+         na.rm = T
+  ) 
+print(sst_ann_1km <- raster::resample(sst_pal, bathy_pal, method = 'bilinear'))
+sst_rs <- rts(sst_ann_1km, getZ(sst_brick)) # Z-values should be the same for al Cortad variables
+# To calculate SST climatology, for each pixel weekly SST aggregated to monthly composites
+# then averaged across the time series to produce 12-monthly mean climatology
+sst_mnt <- apply.monthly(sst_rs, FUN = mean, na.rm = T) #  monthly composites
+sst_ann <- apply.yearly(sst_mnt, FUN = mean, na.rm = T) # averaging across the time series
 ########## Extract only summer months and calculate temperature means across years---------------
 smr_time <- which(month(getZ(sst_crop)) >= 06 & month(getZ(sst_crop))<= 08) 
   print(smr_sst <- subset(sst_crop, smr_time))
@@ -322,7 +337,9 @@ smr_time <- which(month(getZ(sst_crop)) >= 06 & month(getZ(sst_crop))<= 08)
   sst_smr_annl <- zApply(smr_sst, by = year(getZ(smr_sst)), fun = 'mean', 'years')
   plot(sst_smr_annl)
 #####################################################################################################
-####################################################################################################
+####################### Sum of SST Anomalies >= 1 deg C over previous 12 weeks -----------
+##################    (SSTA Degree Heating Week)
+#############################################################################
 
 ssta_dhw <- brick(url_ssta, varname = 'SSTA_DHW')  
 plot(ssta_dhw[[1:4]])
@@ -337,8 +354,29 @@ ssta_dhw_pal <-
           progress = 'text'
   )  
   
-plot(ssta_dhw_pal[[900:910]])
-#   
+plot(ssta_dhw_pal[[1950:1982]])
+
+ssta_dhw_rs <- rts(ssta_dhw_pal, getZ(ssta_dhw))
+
+ssta_dhw_ann <- apply.yearly(ssta_dhw_rs, FUN= max, na.rm = T) # keep all years in the time series
+# because sometimes it can have effect since 2 years before the current year as with SSTA frequency
+plot(ssta_dhw_ann[[30:38]])
+
+print(ssta_dhwAnn_1km <- raster::resample(ssta_dhw_ann@raster, bathy_pal, method = 'ngb'))
+summary(ssta_dhw_pal[[1980]])
+plot(ssta_dhwAnn_1km[[30:38]])
+names(ssta_dhwAnn_1km)  <- year(ssta_dhw_ann@time) # have to name the raster by year
+# of dhw because same value can occur multiple times throughout the year
+ writeRaster(ssta_dhwAnn_1km,
+             'F:/ReefCloud/Covariates_ReefCloud/Outputs/SSTA_DHW_Max/SSTA_DHW.tif',
+             overwrite = T,
+             progress = 'text',
+             format = 'GTiff',
+             datatype = 'FLT4S',
+             bylayer = T,
+             suffix = year(ssta_dhw_ann@time)
+           
+           )
 # install.packages('remote')  
 # remotes::install_github("RS-eco/processNC", build_vignettes=T)
 # library(processNC)  
@@ -391,7 +429,8 @@ ssta_ends <- subset(ssta_rs,endpoints(ssta_rs, 'years')) # so this is ssta frequ
 plot(ssta_ends[[30:38]])
 
 ### Save individual rasters in a folder with names allocated from the dates vector
- writeRaster(ssta_ends@raster,'F:/ReefCloud/Covariates_ReefCloud/Outputs/SSTA_Freq.tif',
+ writeRaster(ssta_ends@raster,
+             'F:/ReefCloud/Covariates_ReefCloud/Outputs/SSTA_Frequency/SSTA_Freq.tif',
              overwrite = T,
              progress = 'text',
              format = 'GTiff',
