@@ -324,11 +324,30 @@ sst_pal <-
          na.rm = T
   ) 
 print(sst_ann_1km <- raster::resample(sst_pal, bathy_pal, method = 'bilinear'))
-sst_rs <- rts(sst_ann_1km, getZ(sst_brick)) # Z-values should be the same for al Cortad variables
+sst_ann_1km <- setZ((sst_ann_1km) - 273.15, getZ(sst_pal))
+
+#sst_rs <- rts((sst_ann_1km)- 273.15, getZ(sst_brick)) # don't really need this
+
+# Z-values should be the same for all Cortad variables
 # To calculate SST climatology, for each pixel weekly SST aggregated to monthly composites
 # then averaged across the time series to produce 12-monthly mean climatology
-sst_mnt <- apply.monthly(sst_rs, FUN = mean, na.rm = T) #  monthly composites
-sst_ann <- apply.yearly(sst_mnt, FUN = mean, na.rm = T) # averaging across the time series
+sst_YM <- zApply(sst_ann_1km,
+                 by = as.yearmon(getZ(sst_ann_1km)),
+                 fun = 'mean')#  year-monthly composites
+
+sst_clim <- zApply(sst_YM, by = months, fun = 'mean')# averaging across the time series
+plot(sst_clim)
+
+writeRaster(sst_clim,
+             'F:/ReefCloud/Covariates_ReefCloud/Outputs/SST_climatology/SST_climatology.tif',
+             overwrite = T,
+             progress = 'text',
+             format = 'GTiff',
+             datatype = 'FLT4S',
+             bylayer = T,
+             suffix = names(sst_clim)
+           
+           )
 ########## Extract only summer months and calculate temperature means across years---------------
 smr_time <- which(month(getZ(sst_crop)) >= 06 & month(getZ(sst_crop))<= 08) 
   print(smr_sst <- subset(sst_crop, smr_time))
