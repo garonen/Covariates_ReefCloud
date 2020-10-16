@@ -288,31 +288,31 @@ sst_brick <- brick(url_sst, varname = 'FilledSST')
 attributes(sst_brick)
 plot(sst_brick[[995]])
 ### since the dates are the same across all datasets i can use the same dates string as before
-sst_brick_sub <- subset(sst_brick, year_idSSTA)
-  sst_brick_sub <- setZ(sst_brick_sub, ssta_time[year_idSSTA])
-# Crop global rasters by a polygon feature of interest----------------------------------
-sst_crop <- brick()
-for (i in 1:nlayers(sst_brick_sub)){
-  sst_brick_pal <- 
-    mask(crop(sst_brick_sub[[i]],
-          extent(pal)),
-           overwrite = T,
-            pal
-  )
-print(sst_crop <- brick(sst_brick_pal,sst_crop))
-}
-plot(sst_crop[[2:5]])
-# have to reintroduce the time
-print(sst_crop <- setZ(sst_crop, sort(ssta_time[year_idSSTA], decreasing = T)))
+# sst_brick_sub <- subset(sst_brick, year_idSSTA)
+#   sst_brick_sub <- setZ(sst_brick_sub, ssta_time[year_idSSTA])
+# # Crop global rasters by a polygon feature of interest----------------------------------
+# sst_crop <- brick()
+# for (i in 1:nlayers(sst_brick_sub)){
+#   sst_brick_pal <- 
+#     mask(crop(sst_brick_sub[[i]],
+#           extent(pal)),
+#            overwrite = T,
+#             pal
+#   )
+# print(sst_crop <- brick(sst_brick_pal,sst_crop))
+# }
+# plot(sst_crop[[2:5]])
+# # have to reintroduce the time
+# print(sst_crop <- setZ(sst_crop, sort(ssta_time[year_idSSTA], decreasing = T)))
 ##### now calculate annual means of SSTA in degrees Kelvin--------------
-sst_annual <- zApply(sst_crop, by = year(getZ(sst_crop)), fun = 'mean')
-plot(sst_annual)
-##### and resample the brick to the resolution of the bathy raster
-sst_annual1km <- resample(sst_annual, bathy_pal, method = 'bilinear') # can write this stack out 
-# but first have to sort out Z values because they get cut out all the time
-print(sst_annual1km <- setZ(sst_annual1km, getZ(sst_annual)))
-
-plot(sst_annual1km)
+# sst_annual <- zApply(sst_crop, by = year(getZ(sst_crop)), fun = 'mean')
+# plot(sst_annual)
+# ##### and resample the brick to the resolution of the bathy raster
+# sst_annual1km <- resample(sst_annual, bathy_pal, method = 'bilinear') # can write this stack out 
+# # but first have to sort out Z values because they get cut out all the time
+# print(sst_annual1km <- setZ(sst_annual1km, getZ(sst_annual)))
+# 
+# plot(sst_annual1km)
 ##################################################################################################
 ##################################################################################################
 sst_pal <- 
@@ -349,12 +349,37 @@ writeRaster(sst_clim,
            
            )
 ########## Extract only summer months and calculate temperature means across years---------------
-smr_time <- which(month(getZ(sst_crop)) >= 06 & month(getZ(sst_crop))<= 08) 
-  print(smr_sst <- subset(sst_crop, smr_time))
-  smr_sst <- setZ(smr_sst, getZ(sst_crop)[smr_time])
-  plot(smr_sst[[1:5]])
-  sst_smr_annl <- zApply(smr_sst, by = year(getZ(smr_sst)), fun = 'mean', 'years')
-  plot(sst_smr_annl)
+smr_time <- which(month(getZ(sst_ann_1km)) >= 06 & month(getZ(sst_ann_1km))<= 08) 
+  # print(smr_sst <- subset(sst_crop, smr_time))
+  # smr_sst <- setZ(smr_sst, getZ(sst_crop)[smr_time])
+  # plot(smr_sst[[1:5]])
+  # sst_smr_annl <- zApply(smr_sst, by = year(getZ(smr_sst)), fun = 'mean', 'years')
+  # plot(sst_smr_annl)
+  
+  
+# smr_sst <- subset(sst_ann_1km,which(month(getZ(sst_ann_1km)) >= 06 & month(getZ(sst_ann_1km))<= 08))  
+# smr_sst <- setZ(smr_sst, getZ(sst_ann_1km)[smr_time])
+# sst_smr_annl <- zApply(smr_sst, by = year(getZ(smr_sst)), fun = 'mean', 'years')
+# plot(sst_smr_annl[[10:24]])
+
+####
+
+smr_ts <- rts(sst_ann_1km, getZ(sst_ann_1km))
+smr_sst1 <- subset(smr_ts,smr_time)
+smr_sst_ann <- apply.yearly(smr_sst1, mean)
+plot(smr_sst_ann[[1:20]])
+names(smr_sst_ann@raster) <- year(smr_sst_ann@time)
+
+writeRaster(smr_sst_ann@raster,
+             'F:/ReefCloud/Covariates_ReefCloud/Outputs/Summer_SST_climatology/summerSST_climatology.tif',
+             overwrite = T,
+             progress = 'text',
+             format = 'GTiff',
+             datatype = 'FLT4S',
+             bylayer = T,
+             suffix = year(smr_sst_ann@time)
+           
+           )  
 #####################################################################################################
 ####################### Sum of SST Anomalies >= 1 deg C over previous 12 weeks -----------
 ##################    (SSTA Degree Heating Week)
