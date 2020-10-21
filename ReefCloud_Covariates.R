@@ -381,9 +381,9 @@ writeRaster(smr_sst_ann@raster,
            
            )  
 #####################################################################################################
-####################### Sum of SST Anomalies >= 1 deg C over previous 12 weeks -----------
-##################    (SSTA Degree Heating Week)
-#############################################################################
+####################### Maximum number of SSTA_DHW during a year----------------------------
+#########   Cortad: Sum of SST Anomalies >= 1 deg C over previous 12 weeks(SSTA Degree Heating Week)
+#####################################################################################################
 
 ssta_dhw <- brick(url_ssta, varname = 'SSTA_DHW')  
 plot(ssta_dhw[[1:4]])
@@ -433,10 +433,11 @@ names(ssta_dhwAnn_1km)  <- year(ssta_dhw_ann@time) # have to name the raster by 
 #                           startdate = 2002,
 #                           enddate = 2019,
 #                           var = 'SSTA_Frequency')
-
-##########  Frequency of SST Anomalies >= 1 deg C over previous 52 weeks #########################
+#####################################################################################################
+##########  Frequency of SST Anomalies >= 1 deg C over previous 52 weeks-----------------------
 ### so in this case i can find the last date of that year and and used that raster to represent 
 ### ssta frequency in that year
+##################################################################################################### 
 ssta_freq <- brick(url_ssta, varname = 'SSTA_Frequency')   
 ssta_freq_pal <- 
     mask(crop(ssta_freq,
@@ -456,15 +457,14 @@ class(z_time)
 summary(ssta_freq_pal[[1980]])
 # first resample to the bathy raster resolution
 print(ssta_freq1km <- raster::resample(ssta_freq_pal, bathy_pal, method = 'ngb'))
-
-  ssta_freq1km[is.na(ssta_freq1km)] <- -99999
-  ssta_freq_rcls <- reclassify(ssta_freq1km, cbind(NA, -99999))
+# to reclass NA's to a different value
+   # ssta_freq_rcls <- reclassify(ssta_freq1km, cbind(NA, -99999))
   
     summary(ssta_freq_rcls[[1980]])
     plot(ssta_freq_rcls[[90:100]])
     
 # convert to rts object
-ssta_rs <- rts(ssta_freq_rcls, z_time)
+ssta_rs <- rts(ssta_freq1km, z_time)
 plot(ssta_rs[[90:100]])
 attributes(ssta_rs)
 
@@ -483,4 +483,89 @@ plot(ssta_ends[[30:38]])
              suffix = rownames(as.data.frame(ssta_ends@time))
            
            )
+#####################################################################################################
+####################### Maximum number of TSA_DHW per raster cell during a year-------------------
+#########   Cortad: Sum of TSA Anomalies whereas TSA is:
+# Thermal Stress Anomalies (defined as SST minus Maximum of Weekly Mean Climatological SST)
+#####################################################################################################
+url_tsa <- 'https://www.ncei.noaa.gov/thredds-ocean/dodsC/cortad/Version6/cortadv6_TSA.nc'
+tsa_brick <- brick(url_tsa, varname = 'TSA_DHW')
+plot(tsa_brick[[1970:1980]])
+
+### mask and crop to the EEZ poly
+  
+tsa_dhw_pal <- 
+    mask(crop(tsa_brick,
+          extent(pal)),
+          overwrite = T,
+          pal,
+          progress = 'text'
+  )  
+  
+plot(tsa_dhw_pal[[1970:1982]])
+
+### resample the original rasters to the resolution of bathymetry raster
+# NB method:'ngb' to keep the original values
+print(tsa_dhwAnn_1km <- raster::resample(tsa_dhw_pal, bathy_pal, method = 'ngb', progress = 'text'))
+
+### Convert to TS object
+tsa_dhw_rs <- rts(tsa_dhwAnn_1km, getZ(tsa_brick))
+
+tsa_dhw_ann <- apply.yearly(tsa_dhw_rs, FUN= max, na.rm = T) # keep all years in the time series
+# because sometimes it can have effect since 2 years before the current year as with TSA frequency
+plot(tsa_dhw_ann[[30:38]])
+
+# plot(tsa_dhwAnn_1km[[30:38]])
+# names(ssta_dhwAnn_1km)  <- year(ssta_dhw_ann@time) # have to name the raster by year
+# # of dhw because same value can occur multiple times throughout the year
+
+writeRaster(tsa_dhw_ann@raster,
+             'F:/ReefCloud/Covariates_ReefCloud/Outputs/TSA_DHW_Max/TSA_DHW.tif',
+             overwrite = T,
+             progress = 'text',
+             format = 'GTiff',
+             datatype = 'FLT4S',
+             bylayer = T,
+             suffix = year(tsa_dhw_ann@time)
+            )
+#####################################################################################################
+##########  Frequency of TSA Anomalies >= 1 deg C over previous 52 weeks-----------------------
+### so in this case i can find the last date of that year and and use
+# that raster to represent tsa frequency in that year
+##################################################################################################### 
+tsa_freq <- brick(url_tsa, varname = 'TSA_Frequency')   
+###
+tsa_freq_pal <- 
+    mask(crop(tsa_freq,
+          extent(pal)),
+          overwrite = T,
+          pal,
+          progress = 'text'
+  )
+plot(tsa_freq_pal[[60:70]])
+
+# first resample to the bathy raster resolution
+print(tsa_freq1km <- raster::resample(tsa_freq_pal, bathy_pal, method = 'ngb'))
+
+# convert to rts object
+tsa_rs <- rts(tsa_freq1km, getZ(tsa_freq))
+plot(tsa_rs[[90:100]])
+
+tsa_ends <- subset(tsa_rs, endpoints(tsa_rs, 'years')) # so this is tsa frequency for
+# the previous 52 weeks in each year
+plot(tsa_ends[[30:38]])
+
+### Save individual rasters in a folder with names allocated from the dates vector
+writeRaster(tsa_ends@raster,
+             'F:/ReefCloud/Covariates_ReefCloud/Outputs/TSA_Frequency/TSA_Freq.tif',
+             overwrite = T,
+             progress = 'text',
+             format = 'GTiff',
+             datatype = 'INT2U',
+             bylayer = T,
+             suffix = rownames(as.data.frame(tsa_ends@time))
+            )
+           
+##################################################################################################
+##################################################################################################
 save.image(file = 'F:/ReefCloud/Covariates_ReefCloud/RC_covariates.RData')
