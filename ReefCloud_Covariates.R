@@ -357,6 +357,11 @@ writeRaster(sst_clim,
              suffix = names(sst_clim)
            
            )
+sst_mean <- calc(sst_ann_1km, fun = mean,
+                 filename ='F:/ReefCloud/Covariates_ReefCloud/Outputs/SST_Timeseries_Mean/SST_mean.tif' ,
+                 na.rm = T)
+plot(sst_mean)
+summary(sst_mean)
 ########## Extract only summer months and calculate temperature means across years---------------
 smr_time <- which(month(getZ(sst_ann_1km)) >= 06 & month(getZ(sst_ann_1km))<= 08) 
   # print(smr_sst <- subset(sst_crop, smr_time))
@@ -389,6 +394,10 @@ writeRaster(smr_sst_ann@raster,
              suffix = year(smr_sst_ann@time)
            
            )  
+sst_smr_mean <- calc(smr_sst1@raster, fun = mean,
+                 filename ='F:/ReefCloud/Covariates_ReefCloud/Outputs/SST_Summer_Mean/SST_Summer_mean.tif' ,
+                 na.rm = T)
+plot(sst_smr_mean)
 #####################################################################################################
 ####################### Maximum number of SSTA_DHW during a year----------------------------
 #########   Cortad: Sum of SST Anomalies >= 1 deg C over previous 12 weeks(SSTA Degree Heating Week)
@@ -430,42 +439,54 @@ names(ssta_dhwAnn_1km)  <- year(ssta_dhw_ann@time) # have to name the raster by 
              suffix = year(ssta_dhw_ann@time)
            
            )
- 
- 
+###################################################################################
+#########  Calculating Week number of Max SSTA DHW -----------------------------
 ######################################################################################################
-maxbrick <- brick()
-max_quantyr <- brick () 
-#mod_year <- data.frame(col = m_wks_df)
+maxbrick <- brick() # brick of week numbers when maximum DHW occurred
+max_quantyr <- brick() # brick of top 25 % DHW values
+maxbrick25 <- brick() # to extract week numbers of top 25 % of DHW values for that year
 mod_year <- list()
-for (i in unique(year(getZ(ssta_dhw_pal)))) {
+for (i in sort(unique(year(getZ(ssta_dhw_pal))), decreasing = T)) {
+          ts_year <- subset(ssta_dhw_pal,
+                            which(year(getZ(ssta_dhw_pal)) == i))
+# calculate top quantile to figure out the DHW. need this to create a threshold of 
+          #values of DHW of top 25 %
+          yr_quant <- calc(ts_year, fun = function(x,...)
+                           as.numeric(quantile(x, probs = 0.75,...)),
+                           na.rm= T)
+# calculate maximum value of DHW per year
+          yr_max <- calc(ts_year, fun = max, na.rm = T)
 
-ts_year <- subset(ssta_dhw_pal, which(year(getZ(ssta_dhw_pal)) == i))
-# calculate to quantile to figure out the DHW
-yr_quant <- calc(ts_year, fun = function(x,...) as.numeric(quantile(x, probs = 0.75,...)), na.rm= T)
-# calculate maximum DHW per year
-yr_max <- calc(ts_year, fun = max, na.rm = T)
 # set NA's to a values otherwise which.max()doesn't work
-ts_year[is.na(ts_year)] <- -9999 
+          ts_year[is.na(ts_year)] <- -9999 
 
 # m <- maxValue(ts_year)
 # mod_year <- rbind(mod_year, data.frame(m))
 # print(colnames(mod_year) <- as.character(i))
-#
-# create raster of week numbers that max DHW occurred in
-max_year <- calc(ts_year, function (x) {which.max(x)})
-names(max_year)<- as.character(i)
-print(maxbrick <- brick(max_year, maxbrick))
 
-names(yr_quant)<- as.character(i)
-print(max_quantyr <- brick(yr_quant, max_quantyr))
-#
-m_wks <- max_year[yr_max > maxValue(yr_quant)] 
+# create raster of week numbers that max DHW occurred in
+          max_year <- calc(ts_year, function (x) {which.max(x)})
+          names(max_year)<- as.character(i)
+          print(maxbrick <- brick(max_year, maxbrick))
+# create brick of top 25 %
+          names(yr_quant)<- as.character(i)
+          print(max_quantyr <- brick(yr_quant, max_quantyr))
+# subset of week numbers that top 25 % of DHW values occurred in each year
+          m_wks <- max_year[yr_max > maxValue(yr_quant)] #, drop = F]
+            m_wks_rst <- max_year
+            m_wks_rst[] <- NA
+            max25 <- which(getValues(max_year) == m_wks)
+            m_wks_rst[max25] <- max_year[max25]  #max_year[m_wks]
+            names(m_wks_rst)<- as.character(i)
+            print(maxbrick25 <- brick(m_wks_rst, maxbrick25))
 #m_wks_df <- data.frame(m_wks)
 #colnames(m_wks_df) <- paste(as.character(i))
 #mod_year <- cbind(mod_year, m_wks_df)
 #m_wks$i <- as.character(i)
-print(mod_year[[i]] <- m_wks)
-names(mod_year)[i] <- as.character(i)
+
+# put it in one big list and name after each year          
+          mod_year[[i]] <- as.data.frame(m_wks, na.rm = T) # this is fixing in case i need it
+          names(mod_year)[i] <- as.character(i)
 # m <- maxValue(ts_year)
 # mod_year <- cbind(mod_year, m)
 #print(colnames(mod_year) <- as.character(i))
@@ -477,19 +498,53 @@ names(mod_year)[i] <- as.character(i)
 # modal(maxValue(ts_year))
 # mod <- calc(ts_year, fun = modal, na.rm = T)
 }
+#calc_quant <- calc(ts_year, fun = quantile)
 
-plot(maxbrick[[28:38]])
-plot(max_quantyr[[28:38]])
+plot(maxbrick25[[28:38]])
+plot(maxbrick[[28:38]]) # save out this brick to use together with vals list
+plot(max_quantyr[[28:38]]) # don't really need to save this one out. used it for 
+# loop calculations
 
-vals <- do.call(cbind, mod_year)
-length(vals)
-attributes(vals$`1980`)
-hist(vals[,'1985'])
+# have to resample the brick to resolution of bathy raster. i prefer to run all the
+# calculations above on the original rasters and 4 km resolution and then resample to
+# a higher resolution
+print(maxbrick1km <- raster::resample(maxbrick, bathy_pal, method = 'ngb'))
+plot(maxbrick1km[[28:38]])
+maxbrick_trim <- trim(maxbrick1km, values = NA)
+summary(maxbrick_trim)
+writeRaster(maxbrick_trim,
+             'F:/ReefCloud/Covariates_ReefCloud/Outputs/Max_Week_SSTA_DHW/MaxWeek_SSTA_DHW.tif',
+             progress = 'text',
+             format = 'GTiff',
+             datatype = 'INT2U',
+             bylayer = T,
+             overwrite = T,
+             suffix = names(maxbrick1km) #colnames(vals) #as.character(rep(1982:2019, each = 1))
+           
+           )
+
+print(maxbrick25_1km <- raster::resample(maxbrick25, bathy_pal, method = 'ngb'))
+plot(maxbrick25_1km[[28:38]])
+writeRaster(maxbrick25_1km,
+             'F:/ReefCloud/Covariates_ReefCloud/Outputs/Max25_Week_SSTA_DHW/MaxWeek25_SSTA_DHW.tif',
+             progress = 'text',
+             format = 'GTiff',
+             datatype = 'INT2U',
+             bylayer = T,
+             overwrite = T,
+             suffix = as.character(rep(1982:2019, each = 1)) #as.character(rep(1982:2019, each = 1))
+           
+           )
+# final list of week numbers when max ssta_dhw occurred. Can calculate modal or hist
+# of each year and subset the cells from maxbrick of the corresponding week number
+vals <- do.call(cbind, mod_year) # this bit doesn't work because i need to put it in a list 
+hist(vals[,'2010'])
+write.csv(vals, 
+'F:/ReefCloud/Covariates_ReefCloud/Outputs/Max_Week_SSTA_DHW/Table_MaxWeek_SSTA_DHW.csv')
 #
-structure(vals)
-par(mfrow = c(2,1))
-plot(x= vals$Week, y= vals$MaxDHW, type = 'l')
-hist(m_wks)
+# par(mfrow = c(2,1))
+# plot(x= vals$Week, y= vals$MaxDHW, type = 'l')
+# hist(m_wks)
 #########################
   
 #  max_ssta <- function(ts, year){
@@ -502,14 +557,14 @@ hist(m_wks)
 # }
 # summary(ts_year)
 
-
-hist(m_ord2)
-print(m_ord3 <- m_ord2[m_ssta1> 4])
-hist(m_ord3)
-as.integer(mean(m_ord3))
-plot(ts_year[[]])
-mode(values(m_ord3))
-mode(m_ord3)
+# 
+# hist(m_ord2)
+# print(m_ord3 <- m_ord2[m_ssta1> 4])
+# hist(m_ord3)
+# as.integer(mean(m_ord3))
+# plot(ts_year[[]])
+# mode(values(m_ord3))
+# mode(m_ord3)
 
 #X1 <- max_ssta(ssta_dhw_pal,1990)    
     
@@ -634,7 +689,7 @@ plot(ssta_ends[[30:38]])
 #####################################################################################################
 url_tsa <- 'https://www.ncei.noaa.gov/thredds-ocean/dodsC/cortad/Version6/cortadv6_TSA.nc'
 tsa_brick <- brick(url_tsa, varname = 'TSA_DHW')
-plot(tsa_brick[[1970:1980]])
+plot(tsa_brick[[1970:1972]])
 
 ### mask and crop to the EEZ poly
   
@@ -674,15 +729,101 @@ writeRaster(tsa_dhw_ann@raster,
              suffix = year(tsa_dhw_ann@time)
             )
 
-####### calculating dates for max dhw-----------
+###################################################################################
+#########  Calculating Week number of Max TSA DHW -----------------------------
+######################################################################################################
+maxbrick_tsa <- brick() # brick of week numbers when maximum DHW occurred
+max_quantyr_tsa <- brick() # brick of top 25 % DHW values
+maxbrick25_tsa <- brick()
+mod_year_tsa <- list() # list of weeks numbers above the 75% threshold
 
-max_dhw <- function(x, t = 6){which(x > t)}
+for (i in sort(unique(year(getZ(tsa_dhw_pal))), decreasing = T)) {
+          ts_year_tsa <- subset(tsa_dhw_pal,
+                            which(year(getZ(tsa_dhw_pal)) == i))
+# calculate top quantile to figure out the DHW. need this to create a threshold of 
+          #values of DHW of top 25 %
+          yr_quant_tsa <- calc(ts_year_tsa, fun = function(x,...)
+                           as.numeric(quantile(x, probs = 0.75,...)),
+                           na.rm= T)
+# calculate maximum value of DHW per year
+          yr_max_tsa <- calc(ts_year_tsa, fun = max, na.rm = T)
 
+# set NA's to a values otherwise which.max()doesn't work
+          ts_year_tsa[is.na(ts_year_tsa)] <- -9999 
 
-m_dhw <- calc(tsa_dhw_pal, fun = max_dhw)
+# create raster of week numbers that max DHW occurred in
+          max_year_tsa <- calc(ts_year_tsa, function (x) {which.max(x)})
+          names(max_year_tsa)<- as.character(i)
+          print(maxbrick_tsa <- brick(max_year_tsa, maxbrick_tsa))
+# create brick of top 25 %
+          names(yr_quant_tsa)<- as.character(i)
+          print(max_quantyr_tsa <- brick(yr_quant_tsa, max_quantyr_tsa))
+# subset of week numbers that top 25 % of DHW values occurred in each year
+          print(m_wks_tsa <- max_year_tsa[yr_max_tsa > maxValue(yr_quant_tsa)] )
+            m_wks_rst_tsa <- max_year_tsa
+            m_wks_rst_tsa[] <- NA
+            max25_tsa <- which(getValues(max_year_tsa) == m_wks_tsa)
+            m_wks_rst_tsa[max25_tsa] <- max_year[max25_tsa]  #max_year[m_wks]
+            names(m_wks_rst_tsa)<- as.character(i)
+            print(maxbrick25_tsa <- brick(m_wks_rst_tsa, maxbrick25_tsa))
+# put it in one big list and name after each year          
+          mod_year_tsa[[i]] <- m_wks_tsa # something is wrong with inserting those
+          # values into the empty list
+          names(mod_year_tsa)[i] <- as.character(i)
+          #print(mod_year_tsa)
+          
 
+}
 
-m_dhw <- raster::calc(tsa_dhw_pal, function(x) max(x, na.rm = T))
+plot(maxbrick25_tsa[[28:38]])
+plot(maxbrick_tsa[[28:38]]) # save out this brick to use together with vals list
+plot(max_quantyr_tsa[[28:38]]) # don't really need to save this one out. used it for 
+# loop calculations
+# final list of week numbers when max ssta_dhw occurred. Can calculate modal or hist
+# of each year and subset the cells from maxbrick of the corresponding week number
+#sapply(mod_year_tsa, write.table, append = T, sep = ',',
+ # file = 'F:/ReefCloud/Covariates_ReefCloud/Outputs/Max_Week_TSA_DHW/List_MaxWeek_TSA_DHW.csv')
+vals_tsa <- do.call(cbind, mod_year_tsa)
+hist(vals_tsa[,'2010'])
+write.csv(vals_tsa, 
+'F:/ReefCloud/Covariates_ReefCloud/Outputs/Max_Week_TSA_DHW/Table_MaxWeek_TSA_DHW.csv')
+summary(mod_year_tsa)
+
+# have to resample the brick to resolution of bathy raster. i prefer to run all the
+# calculations above on the original rasters and 4 km resolution and then resample to
+# a higher resolution
+print(maxbrick_tsa1km <- raster::resample(maxbrick_tsa, bathy_pal, method = 'ngb', na.rm = T))
+summary(maxbrick_tsa1km)
+vals_tsa <- do.call(cbind, mod_year_tsa)
+
+maxbrick_trim_tsa <- trim (maxbrick_tsa1km, values = NA) # to get rid of NA
+plot(maxbrick_trim_tsa[[28:38]])
+summary(maxbrick_trim_tsa)
+writeRaster(maxbrick_trim_tsa,
+             'F:/ReefCloud/Covariates_ReefCloud/Outputs/Max_Week_TSA_DHW/MaxWeek_TSA_DHW.tif',
+             overwrite = T,
+             #NAflag = 9999,
+             progress = 'text',
+             format = 'GTiff',
+             datatype = 'INT2U',
+             bylayer = T,
+             overwrite = T,
+             suffix = colnames(vals_tsa) 
+           
+           )
+
+print(maxbrick25_tsa1km <- raster::resample(maxbrick25_tsa, bathy_pal, method = 'ngb'))
+plot(maxbrick25_tsa1km[[28:38]])
+writeRaster(maxbrick25_tsa1km,
+             'F:/ReefCloud/Covariates_ReefCloud/Outputs/Max25_Week_TSA_DHW/MaxWeek25_TSA_DHW.tif',
+             progress = 'text',
+             format = 'GTiff',
+             datatype = 'INT2U',
+             bylayer = T,
+             overwrite = T,
+             suffix = as.character(rep(1982:2019, each = 1)) #as.character(rep(1982:2019, each = 1))
+           
+           )
 
 #####################################################################################################
 ##########  Frequency of TSA Anomalies >= 1 deg C over previous 52 weeks-----------------------
