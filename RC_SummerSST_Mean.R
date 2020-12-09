@@ -13,9 +13,9 @@ out_dir <- 'F:/ReefCloud/Covariates_ReefCloud/RC_Outputs'
 if(!dir.exists(my_wd)) dir.create(my_wd, showWarnings = F, recursive = T )
 
 #brick, crop and mask the global netcdfs,   
-sst_crop <- mask(
+rast_crop <- mask(
             crop(
-            brick(url,varname),
+            brick(url,varname = varname),
                  extent(my_eez)),
                         my_eez,
                         overwrite=T,
@@ -23,12 +23,12 @@ sst_crop <- mask(
                         na.rm = T)
 # if statement to decide which months represent summer for northern/southern hemisphere----
 if (hemis == 'south') {
-  smr_sst <- brick(subset(sst_crop,
-                          which(month(getZ(sst_crop)) >= 12 | month(getZ(sst_crop))<= 02)))
+  smr_sst <- brick(subset(rast_crop,
+                          which(month(getZ(rast_crop)) >= 12 | month(getZ(rast_crop))<= 02)))
 
   } else if (hemis == 'north'){
-    smr_sst <- brick(subset(sst_crop,
-                            which(month(getZ(sst_crop)) >= 06 & month(getZ(sst_crop))<= 08)))
+    smr_sst <- brick(subset(rast_crop,
+                            which(month(getZ(rast_crop)) >= 06 & month(getZ(rast_crop))<= 08)))
 
   } else {
     stop(cat('hemis must be \'south\' or \'north\''))
