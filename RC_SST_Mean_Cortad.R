@@ -36,7 +36,7 @@ writeRaster(sst_mean,
             datatype = 'FLT4S')
       
   plot(sst_mean)
-    print(paste0("Location : ", my_wd))
+    print(paste0("Location of the processed rasters: ", my_wd))
 }
 
 RC_SST_Mean_Cortad(my_url, my_varname)
