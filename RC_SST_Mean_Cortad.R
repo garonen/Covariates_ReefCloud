@@ -8,7 +8,7 @@ RC_SST_Mean_Cortad <- function(url, varname){
   
 #set designated wd------
 out_dir <- 'F:/ReefCloud/Covariates_ReefCloud/RC_Outputs'
-  my_wd <- paste0(out_dir, '/', my_varname)
+  my_wd <- paste0(out_dir, '/', country, '_', my_varname)
 #and create outputs folder which will be rewritten with every iteration of the function----
 if(!dir.exists(my_wd)) dir.create(my_wd, showWarnings = F, recursive = T )
   
@@ -28,7 +28,7 @@ sst_mean_cel <- calc((sst_crop)- 273.15, fun= mean, na.rm = T)
     
 #save to the created folder----
 writeRaster(sst_mean,
-            filename = paste0(my_wd,'/', 'Mean_', my_varname),
+            filename = paste0(my_wd,'/', country, '_', 'Mean_', my_varname),
             overwrite = T,
             na.rm =T,
             progress = 'text',
