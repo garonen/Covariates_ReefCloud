@@ -35,8 +35,8 @@ if (hemis == 'south') {
   }
 #convert Kelvin to Celsius, and downscale to the bathymetry raster resolution----
 sst_mean_cel <- calc((smr_sst)- 273.15, fun= mean, na.rm = T)
-  sst_mean_1k <- raster::resample(sst_mean_cel, my_bathy, method = 'bilinear')
-    sst_mean <- trim(sst_mean_1k, values = NA)
+  rast_1k <- raster::resample(sst_mean_cel, my_bathy, method = 'bilinear')
+    sst_mean <- trim(rast_1k, values = NA)
     
 #save to the created folder----
 writeRaster(sst_mean,
