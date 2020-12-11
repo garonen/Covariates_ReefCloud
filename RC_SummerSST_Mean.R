@@ -14,8 +14,8 @@ if(!dir.exists(my_wd)) dir.create(my_wd, showWarnings = F, recursive = T )
 
 #brick, crop and mask the global netcdfs,   
 rast_crop <- mask(
-            crop(
-            brick(url,varname = varname),
+             crop(
+             brick(url,varname = varname),
                  extent(my_eez)),
                         my_eez,
                         overwrite=T,
