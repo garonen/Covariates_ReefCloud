@@ -29,13 +29,14 @@ rast_rs <- rts(rast_crop, getZ(rast_crop))
 
 #extract date for last week of the year, those values are the anomaly frequency for the previous
   # 52 weeks in each year--------------
-  rast_freq <- subset(rast_rs,endpoints(rast_rs, 'years'), na.rm = T)  
+rast_endp <- subset(rast_rs,endpoints(rast_rs, 'years'), na.rm = T)  
   
 #downscale to the bathymetry raster resolution----
-rast_1k <- raster::resample(brick(rast_freq@raster), my_bathy, method = 'ngb') 
+rast_1k <- raster::resample(brick(rast_endp@raster), my_bathy, method = 'ngb') 
+  rast_freq <- trim(rast_1k, values = NA)
 
   #save to the created folder----
-writeRaster(rast_1k,
+writeRaster(rast_freq,
             filename = paste0(my_wd,'/', country, '_', my_varname),
             overwrite = T,
             na.rm =T,
@@ -43,10 +44,10 @@ writeRaster(rast_1k,
             format = 'GTiff',
             datatype = 'INT2U',
             bylayer = T,
-            suffix = rownames(as.data.frame(rast_freq@time))
+            suffix = rownames(as.data.frame(rast_endp@time))
            
            )
-plot(rast_1k)  
+plot(rast_freq)  
   print(paste0("Location of the processed rasters: ", my_wd))
   
 }
