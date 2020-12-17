@@ -1,14 +1,19 @@
 source('F:/ReefCloud/Covariates_ReefCloud/Packages_RC_V2.R')
+source('F:/ReefCloud/Covariates_ReefCloud/RC_lookup_url_table.R')
 
-my_url <- 'https://www.ncei.noaa.gov/thredds-ocean/dodsC/cortad/Version6/cortadv6_FilledSST.nc'
-my_varname <- 'FilledSST'
+
+my_varname <- RC_lookup_url_table('MeanSST')
+my_varname
+
+# my_url <- 'https://www.ncei.noaa.gov/thredds-ocean/dodsC/cortad/Version6/cortadv6_FilledSST.nc'
+# my_varname <- 'FilledSST'
 
 
 RC_SST_Mean_Cortad <- function(url, varname){
   
 #set designated wd------
 out_dir <- 'F:/ReefCloud/Covariates_ReefCloud/RC_Outputs'
-  my_wd <- paste0(out_dir, '/', country, '_', my_varname)
+  my_wd <- paste0(out_dir, '/', country, '_', my_varname$cortad_covariate)
 #and create outputs folder which will be rewritten with every iteration of the function----
 if(!dir.exists(my_wd)) dir.create(my_wd, showWarnings = F, recursive = T )
   
@@ -23,12 +28,12 @@ rast_crop <- mask(
                         na.rm = T)
 #convert Kelvin to Celsius, and downscale to the bathymetry raster resolution----
 sst_mean_cel <- calc((rast_crop)- 273.15, fun= mean, na.rm = T)
-  rast_1k <- raster::resample(sst_mean_cel, my_bathy, method = 'bilinear')
+  rast_1k <- raster::resample(sst_mean_cel, my_bathy, method = 'ngb')
     sst_mean <- trim(rast_1k, values = NA)
     
 #save to the created folder----
 writeRaster(sst_mean,
-            filename = paste0(my_wd,'/', country, '_', 'Mean_', my_varname),
+            filename = paste0(my_wd,'/', country, '_', 'Mean_', my_varname$cortad_covariate),
             overwrite = T,
             na.rm =T,
             progress = 'text',
@@ -39,5 +44,5 @@ writeRaster(sst_mean,
     print(paste0("Location of the processed rasters: ", my_wd))
 }
 
-RC_SST_Mean_Cortad(my_url, my_varname)
+RC_SST_Mean_Cortad(my_varname$url,my_varname$cortad_covariate)
 
